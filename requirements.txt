@@ -3,5 +3,3 @@ pandas
 plotly
 requests
 openpyxl
-customtkinter
-darkdetect

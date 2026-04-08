@@ -1,17 +1,12 @@
-import customtkinter as ctk
-from tkinter import filedialog, messagebox
+import streamlit as st
 import pandas as pd
-import requests
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import os
-import threading
+import plotly.express as px
+import requests
 import unicodedata
-import webbrowser
 
-# --- CONFIGURACIÓN ESTÉTICA ---
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
+# --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILOS ---
+st.set_page_config(page_title="Dashboard IMSS | Daniela Vallejo", layout="wide", initial_sidebar_state="expanded")
 
 # ---------------------------
 # UTILIDADES DE NORMALIZACIÓN

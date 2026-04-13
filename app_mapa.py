@@ -272,3 +272,4 @@ class VisionMapElite(ctk.CTk):
 if __name__ == "__main__":
     app = VisionMapElite()
     app.mainloop()
+    

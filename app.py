@@ -5,7 +5,7 @@ import plotly.express as px
 import requests
 import unicodedata
 
-# --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILOS (UX VISUAL) ---
+# --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILOS ---
 st.set_page_config(page_title="IMSS Dashboard | Daniela Vallejo", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown(""" 
@@ -22,7 +22,7 @@ st.markdown("""
 </style> 
 """, unsafe_allow_html=True)
 
-# --- 2. UTILIDADES DE NORMALIZACIÓN (sin cambios) ---
+# --- 2. UTILIDADES DE NORMALIZACIÓN ---
 def limpiar_texto(texto):
     if pd.isna(texto):
         return ""
@@ -71,6 +71,7 @@ if 'selected_state' not in st.session_state:
 def cargar_datos_maestros():
     geo_data = requests.get("https://raw.githubusercontent.com/angelnmara/geojson/master/mexicoHigh.json").json()
     
+    # Población
     df_pob = pd.read_excel("Poblacion mexico.xlsx", sheet_name='POBLACION POR ESTADO')
     df_pob['AÑO'] = df_pob['AÑO'].ffill().astype(int)
     df_pob['POBLACIÓN'] = pd.to_numeric(df_pob['POBLACIÓN'].astype(str).str.replace(r'[ ,]', '', regex=True), errors='coerce').fillna(0)
@@ -80,6 +81,7 @@ def cargar_datos_maestros():
     df_pob['CREC_PCT'] = df_pob.groupby('ESTADO_PADRE')['POBLACIÓN'].pct_change().fillna(0) * 100
     df_pob['TENDENCIA'] = df_pob['CREC_PCT'].apply(lambda v: f"📈 +{v:.1f}%" if v > 0 else (f"📉 {v:.1f}%" if v < 0 else "➖ 0%"))
 
+    # Pacientes clínicos (2016)
     df_clin = pd.read_excel("TOTAL DE PACIENTES DP Y HD.xlsx", sheet_name='PACIENTES POR ESTADO')
     df_clin.columns = df_clin.columns.astype(str).str.strip()
     
@@ -91,41 +93,57 @@ def cargar_datos_maestros():
     df_clin['ESTADO_PADRE'] = df_clin['ESTADO'].apply(identificar_estado_padre)
     df_clin = df_clin[df_clin['ESTADO_PADRE'] != "DESCONOCIDO"]
     
-    # --- TEXTO DESGLOSE EN INGLÉS ---
+    # Texto desglose en inglés
     df_clin['TXT_DESGLOSE'] = "• " + df_clin['ESTADO'] + ": PD (" + df_clin[col_dp].astype(int).astype(str) + ") | HD (" + df_clin[col_hd].astype(int).astype(str) + ")"
 
     df_clin_agrupado = df_clin.groupby('ESTADO_PADRE').agg(
         TOTAL_PACIENTES=('TOTAL_PACIENTES', 'sum'),
-        TOTAL_DP=('DP TOTAL Dic, 2016', 'sum'),      # Se mantiene el nombre de columna interno
+        TOTAL_DP=('DP TOTAL Dic, 2016', 'sum'),
         TOTAL_HD=('HD TOTAL Dic, 2016', 'sum'),
         DESGLOSE=('TXT_DESGLOSE', lambda x: '<br>'.join(x))
     ).reset_index()
 
-    # Datos históricos con nombres en inglés
+    # Datos históricos NACIONALES (traducidos a inglés)
     datos_historicos = [
         {'AÑO': 2014, 'PD_APD': 15147, 'PD_CAPD': 18515, 'PD_TOTAL': 33662, 'PD_PCT': 57.98,
          'HD_INTERNA': 10947, 'HD_SUBROGADA': 13446, 'HD_TOTAL': 24393, 'HD_PCT': 42.02, 'TOTAL_PACIENTES': 58055},
-        # ... (repito el patrón para todos los años)
+        {'AÑO': 2015, 'PD_APD': 14695, 'PD_CAPD': 20036, 'PD_TOTAL': 34731, 'PD_PCT': 57.73,
+         'HD_INTERNA': 10706, 'HD_SUBROGADA': 14725, 'HD_TOTAL': 25431, 'HD_PCT': 42.27, 'TOTAL_PACIENTES': 60162},
+        {'AÑO': 2016, 'PD_APD': 14167, 'PD_CAPD': 22450, 'PD_TOTAL': 36617, 'PD_PCT': 56.75,
+         'HD_INTERNA': 10865, 'HD_SUBROGADA': 17047, 'HD_TOTAL': 27912, 'HD_PCT': 43.25, 'TOTAL_PACIENTES': 64529},
+        {'AÑO': 2017, 'PD_APD': 14753, 'PD_CAPD': 23941, 'PD_TOTAL': 38694, 'PD_PCT': 55.96,
+         'HD_INTERNA': 11485, 'HD_SUBROGADA': 18972, 'HD_TOTAL': 30457, 'HD_PCT': 44.04, 'TOTAL_PACIENTES': 69151},
+        {'AÑO': 2018, 'PD_APD': 15846, 'PD_CAPD': 25438, 'PD_TOTAL': 41284, 'PD_PCT': 55.38,
+         'HD_INTERNA': 11865, 'HD_SUBROGADA': 21394, 'HD_TOTAL': 33259, 'HD_PCT': 44.62, 'TOTAL_PACIENTES': 74543},
+        {'AÑO': 2019, 'PD_APD': 15267, 'PD_CAPD': 23666, 'PD_TOTAL': 38933, 'PD_PCT': 54.46,
+         'HD_INTERNA': 10464, 'HD_SUBROGADA': 22091, 'HD_TOTAL': 32555, 'HD_PCT': 45.54, 'TOTAL_PACIENTES': 71488},
+        {'AÑO': 2020, 'PD_APD': 15953, 'PD_CAPD': 25983, 'PD_TOTAL': 41936, 'PD_PCT': 54.44,
+         'HD_INTERNA': 11347, 'HD_SUBROGADA': 23752, 'HD_TOTAL': 35099, 'HD_PCT': 45.56, 'TOTAL_PACIENTES': 77035},
+        {'AÑO': 2021, 'PD_APD': 13030, 'PD_CAPD': 20948, 'PD_TOTAL': 33978, 'PD_PCT': 50.45,
+         'HD_INTERNA': 10926, 'HD_SUBROGADA': 22445, 'HD_TOTAL': 33371, 'HD_PCT': 49.55, 'TOTAL_PACIENTES': 67349},
+        {'AÑO': 2022, 'PD_APD': 12415, 'PD_CAPD': 21327, 'PD_TOTAL': 33742, 'PD_PCT': 48.19,
+         'HD_INTERNA': 12062, 'HD_SUBROGADA': 24219, 'HD_TOTAL': 36281, 'HD_PCT': 51.81, 'TOTAL_PACIENTES': 70023},
+        {'AÑO': 2023, 'PD_APD': 14663, 'PD_CAPD': 21411, 'PD_TOTAL': 36074, 'PD_PCT': 46.44,
+         'HD_INTERNA': 12691, 'HD_SUBROGADA': 28922, 'HD_TOTAL': 41613, 'HD_PCT': 53.56, 'TOTAL_PACIENTES': 77687},
+        {'AÑO': 2024, 'PD_APD': 16554, 'PD_CAPD': 21233, 'PD_TOTAL': 37787, 'PD_PCT': 45.14,
+         'HD_INTERNA': 14461, 'HD_SUBROGADA': 31456, 'HD_TOTAL': 45917, 'HD_PCT': 54.86, 'TOTAL_PACIENTES': 83704},
+        {'AÑO': 2025, 'PD_APD': 17019, 'PD_CAPD': 19579, 'PD_TOTAL': 36598, 'PD_PCT': 43.84,
+         'HD_INTERNA': 13427, 'HD_SUBROGADA': 33465, 'HD_TOTAL': 46892, 'HD_PCT': 56.16, 'TOTAL_PACIENTES': 83490},
         {'AÑO': 2026, 'PD_APD': 17107, 'PD_CAPD': 19432, 'PD_TOTAL': 36539, 'PD_PCT': 43.22,
          'HD_INTERNA': 13765, 'HD_SUBROGADA': 34246, 'HD_TOTAL': 48011, 'HD_PCT': 56.78, 'TOTAL_PACIENTES': 84550}
     ]
     
-    # Actualizo todos los años (aquí muestro solo el primero y el último como ejemplo)
-    # Copia el mismo cambio de columnas en todos los diccionarios:
-    # DP_DPA  → PD_APD
-    # DP_DPCA → PD_CAPD
-    # DP_TOTAL → PD_TOTAL
-
     df_hist_clin = pd.DataFrame(datos_historicos)
     return geo_data, df_pob, df_clin_agrupado, df_hist_clin
 
-# --- 5. INTERFAZ Y NAVEGACIÓN ---
+# --- 5. CARGA DE DATOS ---
 try:
     geo_data, df_poblacion, df_clinico, df_historico_clinico = cargar_datos_maestros()
 except Exception as e:
     st.error(f"Missing Excel files in the directory. Error: {e}")
     st.stop()
 
+# --- 6. INTERFAZ Y NAVEGACIÓN ---
 st.sidebar.title("HISTORICAL PATIENT MAP")
 st.sidebar.markdown("---")
 
@@ -141,10 +159,56 @@ if st.session_state.selected_state:
 
 st.sidebar.markdown("---")
 
-# --- 6. RENDERIZADO DEL MAPA ---
+# --- 7. RENDERIZADO DEL MAPA ---
 if modulo_seleccionado == "🗺️ Demographic Density by State":
     st.header("Demographic Density by State")
-    # ... (este módulo no tiene cambios)
+    st.markdown("*Use the **▶ Play** button below the map to see the animated historical evolution.*")
+    
+    ultimo_anio = df_poblacion['AÑO'].max()
+    df_ultimo = df_poblacion[df_poblacion['AÑO'] == ultimo_anio]
+    
+    col1, col2 = st.columns(2)
+    col1.metric(f"Total National Population ({ultimo_anio})", f"{df_ultimo['POBLACIÓN'].sum():,.0f}")
+    estado_top = df_ultimo.sort_values('POBLACIÓN', ascending=False).iloc[0]
+    col2.metric(f"State with Highest Burden ({ultimo_anio})", estado_top['ESTADO_PADRE'], f"{estado_top['POBLACIÓN']:,.0f}")
+
+    # MAPA ANIMADO (corregido para que no desaparezca)
+    fig = px.choropleth(
+        df_poblacion,
+        geojson=geo_data,
+        locations='ESTADO_PADRE',
+        featureidkey="properties.name",
+        color='POBLACIÓN',
+        animation_frame='AÑO',
+        color_continuous_scale="Greens",
+        range_color=[0, df_poblacion['POBLACIÓN'].max()],
+        custom_data=['TENDENCIA']
+    )
+
+    fig.update_traces(
+        hovertemplate="<b>%{location}</b><br>Patients: %{z:,.0f}<br>Trend: %{customdata[0]}<extra></extra>",
+        marker_line_color='#333333',
+        marker_line_width=0.8
+    )
+
+    fig.update_geos(
+        fitbounds="locations",
+        visible=False,
+        showcoastlines=True,
+        coastlinecolor="#333333",
+        showland=True,
+        landcolor="#f0f0f0"
+    )
+
+    fig.update_layout(
+        margin={"r":0, "t":0, "l":0, "b":0},
+        height=650,
+        template="plotly",           # Más estable que plotly_white
+        paper_bgcolor="white",
+        geo_bgcolor="#f8f9fa"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 elif modulo_seleccionado == "🏥 Treatment Landscape in Mexico":
     st.header("Treatment Landscape in Mexico")
@@ -175,14 +239,20 @@ elif modulo_seleccionado == "🏥 Treatment Landscape in Mexico":
 
         # Gráfico histórico
         fig_hist = go.Figure()
-        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['PD_TOTAL'], 
-                                     mode='lines+markers', name='Peritoneal Dialysis (PD)', 
-                                     line=dict(color='#3498db', width=3)))
-        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['HD_TOTAL'], 
-                                     mode='lines+markers', name='Hemodialysis (HD)', 
-                                     line=dict(color='#e74c3c', width=3)))
-        fig_hist.update_layout(template="plotly_white", paper_bgcolor="white", plot_bgcolor="white", 
-                               height=300, margin={"r":0,"t":30,"l":0,"b":0})
+        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['PD_TOTAL'],
+                                      mode='lines+markers', name='Peritoneal Dialysis (PD)',
+                                      line=dict(color='#3498db', width=3)))
+        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['HD_TOTAL'],
+                                      mode='lines+markers', name='Hemodialysis (HD)',
+                                      line=dict(color='#e74c3c', width=3)))
+        
+        fig_hist.update_layout(
+            template="plotly",
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            height=300,
+            margin={"r":0,"t":30,"l":0,"b":0}
+        )
         st.plotly_chart(fig_hist, use_container_width=True)
 
     with tab2:
@@ -191,9 +261,102 @@ elif modulo_seleccionado == "🏥 Treatment Landscape in Mexico":
         
         with col_map:
             capa = st.radio("View Layer:", ["Renal Replacement Therapy 2026", "PD (2016)", "HD (2016)"], horizontal=True)
-            # ... resto del mapa sin cambios importantes
+            
+            map_config = {
+                "Renal Replacement Therapy 2026": ('TOTAL_PACIENTES', 'Greens'),
+                "PD (2016)": ('TOTAL_DP', 'Blues'),
+                "HD (2016)": ('TOTAL_HD', 'Reds')
+            }
+            
+            val_col, scale = map_config[capa]
+
+            # MAPA ESTÁTICO (corregido)
+            fig_audit = go.Figure(go.Choropleth(
+                geojson=geo_data,
+                locations=df_clinico['ESTADO_PADRE'],
+                z=df_clinico[val_col],
+                featureidkey="properties.name",
+                colorscale=scale,
+                marker_line_color='#333333',
+                marker_line_width=0.8
+            ))
+
+            fig_audit.update_geos(
+                fitbounds="locations",
+                visible=False,
+                showcoastlines=True,
+                coastlinecolor="#333333",
+                showland=True,
+                landcolor="#f0f0f0"
+            )
+
+            fig_audit.update_layout(
+                template="plotly",
+                paper_bgcolor="white",
+                geo_bgcolor="#f8f9fa",
+                margin={"r":0,"t":0,"l":0,"b":0},
+                height=600,
+                clickmode="event+select",
+                dragmode=False
+            )
+
+            map_event = st.plotly_chart(fig_audit, use_container_width=True, on_select="rerun", selection_mode="points", key="audit_map")
+
+            if map_event and "selection" in map_event and map_event["selection"]["points"]:
+                st.session_state.selected_state = map_event["selection"]["points"][0]["location"]
 
         with col_dash:
             if st.session_state.selected_state:
-                # ... (el desglose ya usa el TXT_DESGLOSE que ahora dice PD en vez de DP)
-                pass
+                st.markdown(f'<div class="fade-in">', unsafe_allow_html=True)
+                estado = st.session_state.selected_state
+                data_est = df_clinico[df_clinico['ESTADO_PADRE'] == estado].iloc[0]
+                
+                st.subheader(f"📍 {estado}")
+                
+                # Mini-mapa
+                fig_z = go.Figure(go.Choropleth(
+                    geojson=geo_data,
+                    locations=[estado],
+                    z=[data_est[val_col]],
+                    featureidkey="properties.name",
+                    colorscale=scale,
+                    showscale=False,
+                    marker_line_color='#333333',
+                    marker_line_width=1
+                ))
+                
+                fig_z.update_geos(
+                    fitbounds="locations",
+                    visible=False,
+                    showcoastlines=True,
+                    coastlinecolor="#333333",
+                    showland=True,
+                    landcolor="#f0f0f0"
+                )
+                
+                fig_z.update_layout(
+                    template="plotly",
+                    height=200,
+                    margin={"r":0,"t":0,"l":0,"b":0},
+                    paper_bgcolor='white',
+                    geo_bgcolor="#f8f9fa"
+                )
+                
+                st.plotly_chart(fig_z, use_container_width=True, config={'displayModeBar': False})
+
+                # Tarjeta de detalle
+                st.markdown(f"""
+                <div class="report-card">
+                    <p style="margin-bottom:5px; color:#8b949e;">Regional {capa}</p>
+                    <h2 style="margin:0; color:#58a6ff;">{data_est[val_col]:,.0f}</h2>
+                    <hr style="border-color:#30363d">
+                    <p><b>Peritoneal Dialysis:</b> {data_est['TOTAL_DP']:,}</p>
+                    <p><b>Hemodialysis:</b> {data_est['TOTAL_HD']:,}</p>
+                    <div style="background:#0d1117; padding:10px; border-radius:5px; margin-top:10px; font-size:0.9rem;">
+                        {data_est['DESGLOSE']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info("Select a state on the map to view the detailed breakdown.")

@@ -6,7 +6,7 @@ import requests
 import unicodedata
 
 # --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILOS (UX VISUAL) ---
-st.set_page_config(page_title="Dashboard IMSS | Daniela Vallejo", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="IMSS Dashboard | Daniela Vallejo", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -118,97 +118,107 @@ def cargar_datos_maestros():
 try:
     geo_data, df_poblacion, df_clinico, df_historico_clinico = cargar_datos_maestros()
 except Exception as e:
-    st.error(f"Faltan los archivos Excel en la carpeta. Error: {e}")
+    st.error(f"Missing Excel files in the directory. Error: {e}")
     st.stop()
 
-st.sidebar.title("MAPA HISTORICO DE PACIENTES")
+st.sidebar.title("HISTORICAL PATIENT MAP")
 st.sidebar.markdown("---")
 modulo_seleccionado = st.sidebar.radio(
-    "Seleccione la vista de datos:",
-    ("🗺️ Evolución Poblacional (Histórico)", "🏥 Auditoría Clínica (IMSS)")
+    "Select data view:",
+    ("🗺️ Demographic Density by State", "🏥 Treatment Landscape in Mexico")
 )
 
 if st.session_state.selected_state:
-    if st.sidebar.button("🔄 Resetear Selección"):
+    if st.sidebar.button("🔄 Reset Selection"):
         st.session_state.selected_state = None
         st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.info("Usuario: Daniela Vallejo Avalos\n\nEstado: Conectado a Base Local")
+
 
 # --- 6. RENDERIZADO DEL MAPA ---
 
-if modulo_seleccionado == "🗺️ Evolución Poblacional (Histórico)":
-    st.header("Análisis Demográfico Nacional")
-    st.markdown("*Use el botón de **▶ Reproducir** debajo del mapa para ver la evolución histórica animada.*")
+if modulo_seleccionado == "🗺️ Demographic Density by State":
+    st.header("Demographic Density by State")
+    st.markdown("*Use the **▶ Play** button below the map to see the animated historical evolution.*")
     
     ultimo_anio = df_poblacion['AÑO'].max()
     df_ultimo = df_poblacion[df_poblacion['AÑO'] == ultimo_anio]
     col1, col2 = st.columns(2)
-    col1.metric(f"Población Nacional Total ({ultimo_anio})", f"{df_ultimo['POBLACIÓN'].sum():,.0f}")
+    col1.metric(f"Total National Population ({ultimo_anio})", f"{df_ultimo['POBLACIÓN'].sum():,.0f}")
     estado_top = df_ultimo.sort_values('POBLACIÓN', ascending=False).iloc[0]
-    col2.metric(f"Estado con Mayor Carga ({ultimo_anio})", estado_top['ESTADO_PADRE'], f"{estado_top['POBLACIÓN']:,.0f}")
+    col2.metric(f"State with Highest Burden ({ultimo_anio})", estado_top['ESTADO_PADRE'], f"{estado_top['POBLACIÓN']:,.0f}")
     
     fig = px.choropleth(
         df_poblacion, geojson=geo_data, locations='ESTADO_PADRE', featureidkey="properties.name",
-        color='POBLACIÓN', animation_frame='AÑO', color_continuous_scale="viridis",
+        color='POBLACIÓN', animation_frame='AÑO', color_continuous_scale="Greens",
         range_color=[0, df_poblacion['POBLACIÓN'].max()], custom_data=['TENDENCIA']
     )
-    fig.update_traces(hovertemplate="<b>%{location}</b><br>Pacientes: %{z:,.0f}<br>Evolución: %{customdata[0]}<extra></extra>")
+    # AÑADIDO: Bordes oscuros para que no se pierdan los estados en el fondo blanco
+    fig.update_traces(
+        hovertemplate="<b>%{location}</b><br>Patients: %{z:,.0f}<br>Trend: %{customdata[0]}<extra></extra>",
+        marker_line_color='#333333',
+        marker_line_width=0.8
+    )
     fig.update_geos(fitbounds="locations", visible=False)
-    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=650, template="plotly_dark")
+    # AÑADIDO: template plotly_white y paper/geo_bgcolor en blanco
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=650, template="plotly_white", paper_bgcolor="white", geo_bgcolor="white")
     st.plotly_chart(fig, use_container_width=True)
 
-elif modulo_seleccionado == "🏥 Auditoría Clínica (IMSS)": 
-    st.header("Auditoría Clínica de Tratamientos")
+elif modulo_seleccionado == "🏥 Treatment Landscape in Mexico": 
+    st.header("Treatment Landscape in Mexico")
     
-    tab1, tab2 = st.tabs(["📈 1. Reporte Histórico Nacional", "🗺️ 2. Distribución Geográfica (Corte 2016)"])
+    tab1, tab2 = st.tabs(["📈 1. National Historical Report", "🗺️ 2. Geographic Distribution (2016 Snapshot)"])
     
     with tab1:
-        st.subheader("Evolución Nacional (DP vs HD)")
+        st.subheader("National Evolution: DP and HD")
         anios_disponibles = sorted(df_historico_clinico['AÑO'].unique().tolist())
-        anio_sel = st.select_slider("🗓️ Seleccione el Año a Consultar:", options=anios_disponibles, value=2026)
+        anio_sel = st.select_slider("🗓️ Select Year to View:", options=anios_disponibles, value=2026)
         data_anio = df_historico_clinico[df_historico_clinico['AÑO'] == anio_sel].iloc[0]
         
-        st.metric("Total Nacional de Pacientes", f"{data_anio['TOTAL_PACIENTES']:,.0f}")
+        st.metric("Total National Patients", f"{data_anio['TOTAL_PACIENTES']:,.0f}")
         col_dp, col_hd = st.columns(2)
         with col_dp:
-            st.markdown(f"### 🔵 Diálisis (DP) - {data_anio['DP_PCT']}%")
+            st.markdown(f"### 🔵 Dialysis (DP) - {data_anio['DP_PCT']}%")
             st.metric("TOTAL DP", f"{data_anio['DP_TOTAL']:,.0f}")
             c1, c2 = st.columns(2)
-            c1.metric("Pacientes DPA", f"{data_anio['DP_DPA']:,.0f}")
-            c2.metric("Pacientes DPCA", f"{data_anio['DP_DPCA']:,.0f}")
+            c1.metric("DPA Patients", f"{data_anio['DP_DPA']:,.0f}")
+            c2.metric("DPCA Patients", f"{data_anio['DP_DPCA']:,.0f}")
         with col_hd:
-            st.markdown(f"### 🔴 Hemodiálisis (HD) - {data_anio['HD_PCT']}%")
+            st.markdown(f"### 🔴 Hemodialysis (HD) - {data_anio['HD_PCT']}%")
             st.metric("TOTAL HD", f"{data_anio['HD_TOTAL']:,.0f}")
             c1, c2 = st.columns(2)
-            c1.metric("HD Interna", f"{data_anio['HD_INTERNA']:,.0f}")
-            c2.metric("HD Subrogada", f"{data_anio['HD_SUBROGADA']:,.0f}")
+            c1.metric("Internal HD", f"{data_anio['HD_INTERNA']:,.0f}")
+            c2.metric("Subrogated HD", f"{data_anio['HD_SUBROGADA']:,.0f}")
             
         st.markdown("---")
         fig_hist = go.Figure()
-        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['DP_TOTAL'], mode='lines+markers', name='Diálisis (DP)', line=dict(color='#3498db', width=3)))
-        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['HD_TOTAL'], mode='lines+markers', name='Hemodiálisis (HD)', line=dict(color='#e74c3c', width=3)))
-        fig_hist.update_layout(template="plotly_dark", height=300, margin={"r":0,"t":30,"l":0,"b":0})
+        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['DP_TOTAL'], mode='lines+markers', name='Dialysis (DP)', line=dict(color='#3498db', width=3)))
+        fig_hist.add_trace(go.Scatter(x=df_historico_clinico['AÑO'], y=df_historico_clinico['HD_TOTAL'], mode='lines+markers', name='Hemodialysis (HD)', line=dict(color='#e74c3c', width=3)))
+        # AÑADIDO: template plotly_white para alinear con el estilo institucional
+        fig_hist.update_layout(template="plotly_white", paper_bgcolor="white", plot_bgcolor="white", height=300, margin={"r":0,"t":30,"l":0,"b":0})
         st.plotly_chart(fig_hist, use_container_width=True)
 
     with tab2:
-        st.subheader("Auditoría Regional Activa (Corte 2016)")
+        st.subheader("Treatment Landscape in Mexico")
         
         col_map, col_dash = st.columns([1.8, 1])
         
         with col_map:
-            capa = st.radio("Ver Capa:", ["Renal Replacement Therapy 2026", "Diálisis (DP)", "Hemodiálisis (HD)"], horizontal=True)
-            map_config = {"Renal Replacement Therapy 2026": ('TOTAL_PACIENTES', 'Plasma'), "Diálisis (DP)": ('TOTAL_DP', 'Blues'), "Hemodiálisis (HD)": ('TOTAL_HD', 'Reds')}
+            capa = st.radio("View Layer:", ["Renal Replacement Therapy 2026", "DP (2016)", "HD (2016)"], horizontal=True)
+            map_config = {"Renal Replacement Therapy 2026": ('TOTAL_PACIENTES', 'Greens'), "DP (2016)": ('TOTAL_DP', 'Blues'), "HD (2016)": ('TOTAL_HD', 'Reds')}
             val_col, scale = map_config[capa]
 
             fig_audit = go.Figure(go.Choropleth(
                 geojson=geo_data, locations=df_clinico['ESTADO_PADRE'], z=df_clinico[val_col],
-                featureidkey="properties.name", colorscale=scale, marker_line_color='#0d1117'
+                featureidkey="properties.name", colorscale=scale, 
+                marker_line_color='#333333', marker_line_width=0.8 # AÑADIDO: Bordes oscuros obligatorios
             ))
             fig_audit.update_geos(fitbounds="locations", visible=False)
+            # AÑADIDO: template plotly_white y fondo blanco
             fig_audit.update_layout(
-                template="plotly_dark", margin={"r":0,"t":0,"l":0,"b":0}, height=600,
+                template="plotly_white", paper_bgcolor="white", geo_bgcolor="white", 
+                margin={"r":0,"t":0,"l":0,"b":0}, height=600,
                 clickmode="event+select", dragmode=False
             )
             
@@ -227,20 +237,22 @@ elif modulo_seleccionado == "🏥 Auditoría Clínica (IMSS)":
                 
                 fig_z = go.Figure(go.Choropleth(
                     geojson=geo_data, locations=[estado], z=[data_est[val_col]],
-                    featureidkey="properties.name", colorscale=scale, showscale=False
+                    featureidkey="properties.name", colorscale=scale, showscale=False,
+                    marker_line_color='#333333', marker_line_width=1 # AÑADIDO: Borde oscuro para el mini mapa
                 ))
                 fig_z.update_geos(fitbounds="locations", visible=False)
-                fig_z.update_layout(template="plotly_dark", height=200, margin={"r":0,"t":0,"l":0,"b":0}, paper_bgcolor='rgba(0,0,0,0)')
+                # AÑADIDO: Fondo blanco en mini mapa
+                fig_z.update_layout(template="plotly_white", height=200, margin={"r":0,"t":0,"l":0,"b":0}, paper_bgcolor='white', geo_bgcolor='white')
                 st.plotly_chart(fig_z, use_container_width=True, config={'displayModeBar': False})
                 
                 # --- MEJORA: VALORES DINÁMICOS EN LA TARJETA ---
                 st.markdown(f"""
                 <div class="report-card">
-                    <p style="margin-bottom:5px; color:#8b949e;">{capa} Regional</p>
+                    <p style="margin-bottom:5px; color:#8b949e;">Regional {capa}</p>
                     <h2 style="margin:0; color:#58a6ff;">{data_est[val_col]:,.0f}</h2>
                     <hr style="border-color:#30363d">
-                    <p><b>Diálisis:</b> {data_est['TOTAL_DP']:,}</p>
-                    <p><b>Hemodiálisis:</b> {data_est['TOTAL_HD']:,}</p>
+                    <p><b>Dialysis:</b> {data_est['TOTAL_DP']:,}</p>
+                    <p><b>Hemodialysis:</b> {data_est['TOTAL_HD']:,}</p>
                     <div style="background:#0d1117; padding:10px; border-radius:5px; margin-top:10px; font-size:0.9rem;">
                         {data_est['DESGLOSE']}
                     </div>
@@ -248,4 +260,4 @@ elif modulo_seleccionado == "🏥 Auditoría Clínica (IMSS)":
                 """, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.info("Seleccione un estado en el mapa para ver el desglose detallado.")
+                st.info("Select a state on the map to view the detailed breakdown.")
